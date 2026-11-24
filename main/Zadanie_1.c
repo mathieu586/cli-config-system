@@ -25,7 +25,7 @@ static int set_cmd(int argc, char **argv) {
     const char *key = set_args.key->sval[0];
     const char *val_str = set_args.val->sval[0];
 
-    nvs_handle_t handle;  // zmienna na klucz dostepu do pamieci
+    nvs_handle_t handle;
     esp_err_t err = nvs_open("storage", NVS_READWRITE, &handle);
 
     if (err != ESP_OK) {
@@ -71,7 +71,7 @@ static int set_cmd(int argc, char **argv) {
             }else {
                 size_t str_len = 0;
                 uint8_t should_write = 1;
-                esp_err_t err_get = nvs_get_str(handle, key, NULL, &str_len); // sprawdza dlugosc stringa
+                esp_err_t err_get = nvs_get_str(handle, key, NULL, &str_len);
 
                 if (err_get == ESP_OK) {
                         char *current_str = malloc(str_len);
@@ -107,6 +107,7 @@ static int set_cmd(int argc, char **argv) {
 
             }else{
                 err = nvs_set_str(handle, key, val_str);
+                printf("Zapisano zmienną: %s", key);
             }
         }    
     }
@@ -163,6 +164,10 @@ static struct{
     struct arg_str *key; 
     struct arg_end *end;
 } get_args;
+
+static struct {
+    struct arg_end *end;
+}list_args;
 
 static int get_cmd(int argc, char **argv) {
     int error_count = arg_parse(argc, argv, (void **)&get_args);
@@ -231,6 +236,92 @@ static int get_cmd(int argc, char **argv) {
     return 0;
 }
 
+static int list_cmd(int argc, char **argv) {
+    int error_count = arg_parse(argc, argv, (void**)&list_args);
+    if(error_count != 0) {
+        arg_print_errors(stderr, list_args.end, argv[0]);
+        return 1;
+    }
+
+    nvs_iterator_t iter = NULL;
+    esp_err_t err_entry_find = nvs_entry_find("nvs", "storage", NVS_TYPE_ANY, &iter);
+
+    if (err_entry_find == ESP_ERR_NVS_NOT_FOUND) {
+        printf("Brak zapisanych zmiennych.\n");
+        return 0;
+    }
+    if (err_entry_find != ESP_OK) {
+        printf("Blad przeszukiwania pamieci NVS: %s\n", esp_err_to_name(err_entry_find));
+        return 1;
+    }
+
+    nvs_handle_t handle;
+    esp_err_t err = nvs_open("storage", NVS_READWRITE, &handle);
+
+    if (err != ESP_OK) {
+        printf("Blad otwarcia pamieci NVS\n");
+        return 1;
+    }
+
+    while (err_entry_find == ESP_OK) {
+        nvs_entry_info_t info;
+        nvs_entry_info(iter, &info);
+
+        switch (info.type)
+        {
+        case NVS_TYPE_I32:
+            int32_t val_int;
+            if (nvs_get_i32(handle, info.key, &val_int) == ESP_OK) {
+                int32_t val_int;
+                err = nvs_get_i32(handle, info.key, &val_int);
+                if (err == ESP_OK) {
+                    printf("%s [int] = ", info.key);
+                    printf("%ld\n", (long)val_int);
+                }
+            }
+            break;
+        case NVS_TYPE_BLOB:
+            float val_float;
+            size_t size_float = sizeof(float);
+            err = nvs_get_blob(handle, info.key, &val_float, &size_float);
+            if (err == ESP_OK) {
+                printf("%s [float] = ", info.key);
+                printf("%f\n", (float)val_float);
+            }
+            break;
+        case NVS_TYPE_STR:
+            size_t length = 0;
+            err = nvs_get_str(handle, info.key, NULL, &length);
+            if (err == ESP_OK) {
+                char *val_str = malloc(length);
+                if (val_str != NULL) {
+                    nvs_get_str(handle, info.key, val_str, &length);
+                    printf("%s [string] = %s\n", info.key, val_str);
+                    free(val_str);
+                }
+            }
+            break;
+        case NVS_TYPE_U8:
+            uint8_t val_bool;
+            err = nvs_get_u8(handle, info.key, &val_bool);
+            if (err == ESP_OK) {
+                printf("%s [bool] = ", info.key);
+                printf("%s\n", val_bool ? "true" : "false");
+            }
+            break;
+        default:
+            break;
+        }
+
+        err_entry_find = nvs_entry_next(&iter);
+    }
+
+    nvs_release_iterator(iter);
+    nvs_commit(handle);
+    nvs_close(handle);
+    return 0;
+}
+
 void register_set_cmd(void) {
     set_args.key = arg_str1(NULL, NULL, "<nazwa>", "Nazwa zmiennej");
     set_args.val = arg_str1(NULL, NULL, "<wartosc>", "Wartosc zmiennej (bool, int lub tekst)");
@@ -277,6 +368,20 @@ void register_get_cmd(void) {
     ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
 }
 
+void register_list_cmd(void) {
+    list_args.end = arg_end(1);
+
+    const esp_console_cmd_t cmd = {
+        .command = "list",
+        .help = "Wypisz wszsytkie zapisane w pamięci zmienne",
+        .hint = NULL,
+        .func = &list_cmd,
+        .argtable = &list_args
+    };
+    
+    ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
+}
+
 void app_main(void){
     esp_err_t err = nvs_flash_init();
     if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
@@ -294,6 +399,7 @@ void app_main(void){
     register_set_cmd();
     register_del_cmd();
     register_get_cmd();
+    register_list_cmd();
 
 
     ESP_ERROR_CHECK(esp_console_new_repl_stdio(&repl_config, &repl));
