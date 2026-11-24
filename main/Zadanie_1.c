@@ -322,6 +322,31 @@ static int list_cmd(int argc, char **argv) {
     return 0;
 }
 
+void init_default(){
+    nvs_iterator_t iter = NULL;
+    esp_err_t err = nvs_entry_find("nvs", "storage", NVS_TYPE_ANY, &iter);
+
+    if (err == ESP_OK) {
+        nvs_release_iterator(iter);
+        return;
+    }
+
+    if (err == ESP_ERR_NVS_NOT_FOUND) {
+        nvs_handle_t handle;
+        esp_err_t err_open = nvs_open("storage", NVS_READWRITE, &handle);
+        if (err_open == ESP_OK) {
+            printf("Nie znaleziono zapisanej konfiguracji - wczytano konfigurację domyślną");
+            nvs_set_str(handle, "rocket_name", "AETHER");   
+            nvs_set_i32(handle, "height", 0);
+            nvs_set_u8(handle, "is_launched", 0);
+
+            nvs_commit(handle);
+            nvs_close(handle);
+        }
+    }
+    nvs_release_iterator(iter);
+}
+
 void register_set_cmd(void) {
     set_args.key = arg_str1(NULL, NULL, "<nazwa>", "Nazwa zmiennej");
     set_args.val = arg_str1(NULL, NULL, "<wartosc>", "Wartosc zmiennej (bool, int lub tekst)");
