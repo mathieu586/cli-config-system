@@ -22,7 +22,7 @@ Zadanie_1/
 ├── README.md               # Dokumentacja projektu
 └── main/
     ├── CMakeLists.txt      # Rejestracja komponentu głównego
-    └── Zadanie_1.c         # Implementacja logiki NVS, inicjalizacji domyślnej oraz komend CLI
+    └── main.c         # Implementacja logiki NVS, inicjalizacji domyślnej oraz komend CLI
 ```
 ## Jak uruchomić
 
