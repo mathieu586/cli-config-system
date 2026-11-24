@@ -74,7 +74,7 @@ static int set_cmd(int argc, char **argv) {
                 esp_err_t err_get = nvs_get_str(handle, key, NULL, &str_len);
 
                 if (err_get == ESP_OK) {
-                        char *current_str = malloc(str_len);
+                    char *current_str = malloc(str_len);
                     if(current_str != NULL){
                         nvs_get_str(handle, key, current_str, &str_len);
                         
@@ -107,7 +107,7 @@ static int set_cmd(int argc, char **argv) {
 
             }else{
                 err = nvs_set_str(handle, key, val_str);
-                printf("Zapisano zmienną: %s", key);
+                printf("Zapisano zmienną: %s\n", key);
             }
         }    
     }
